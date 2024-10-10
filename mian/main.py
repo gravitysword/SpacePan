@@ -1,6 +1,3 @@
-import cv2
-import numpy as np
-from PIL import Image
 import time
 from compiler import file2img, img2file
 from convey import  down,up_request as up
