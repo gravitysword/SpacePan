@@ -1,0 +1,9 @@
+{
+    "cookies": {
+        "upload_image": null,
+        "download_image": null
+    },
+    "webdriver": {
+        "path" : "C:\\Program Files\\Google\\Chrome\\Application\\chromedriver.exe"
+    }
+}
