@@ -1,2 +1,2 @@
 # SpacePan
-a private cloud drive for free and fast
+a private cloud drive for free
