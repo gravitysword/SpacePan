@@ -13,8 +13,8 @@ def Up():
 
 def Down():
     a = time.time()
-    img_dir = f"../res/temp/{time.time()}"
-    file_path = r"../res/b1"
+    img_dir = f"D:/zzztest/2"
+    file_path = r"D:/zzztest/3"
     url = 'https://www.toutiao.com/article/7439928751518925353/'
     down.download(url, img_dir)
     down.img2file(img_dir, file_path)

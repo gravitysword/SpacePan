@@ -7,56 +7,56 @@ import cv2, json
 from utile.u import *
 from multiprocessing import Pool, cpu_count
 
-with open('../config/config.json', 'r') as f:
+with open('../config/config.json', 'r',encoding='utf-8') as f:
     config = json.loads(f.read())
     play_cookies = config["cookies"]["upload"]
     cookies = {cookie['name']: cookie['value'] for cookie in play_cookies}
 
+def up_img(img_path=None,img_data=None):
 
-def create_element(config):
-    config = config["data"]
-    img_url = config["image_url"]
-    img_uri = config["image_uri"]
-    img_width = config["image_width"]
-    img_height = config["image_height"]
-    img_mime_type = config["image_mime_type"]
-    img_type = config["image_type"]
 
-    element = f'''
-<div __syl_tag="true" contenteditable="false" draggable="true" class="">
-    <mask>
-        <div class="pgc-image pgc-card-fixWidth">
-            <div class="pgc-img-wrapper">
-                <div class="img-wrapper">
-                    <div class="img-loading-container default">
-                        <img src="{img_url}" class="" image_type="{img_type}" mime_type="{img_mime_type}" web_uri="{img_uri}" img_width="{img_width}" img_height={img_height}" width={img_width}">
-                        <span class="img-loading-progress default">
-                            <span class="img-loading-bar">
-                            </span>
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </mask>
-</div>'''
-    return element
+    if img_data:
+        url = "https://mp.toutiao.com/spice/image?upload_source=20020002&aid=1231&device_platform=web"
+        a = requests.post(url=url, files={'image': img_data}, cookies=cookies)
+    else:
+        url = "https://mp.toutiao.com/spice/image?upload_source=20020002&aid=1231&device_platform=web"
+        a = requests.post(url=url, files={'image': open(img_path, 'rb')}, cookies=cookies)
+    return a.json()["data"]["image_url"]
 
+
+def save_img(image_path, RGB_data):
+    cv2.imwrite(image_path, RGB_data)
 
 def upload(img_dir, pan_path):
     a = time.time()
+
+    storage = {}
+
     imgs = [join_path(os.path.abspath(img_dir), img_name) for img_name in os.listdir(img_dir) if
-            os.path.splitext(img_name)[1].lower() in {".png"}]
+            os.path.splitext(img_name)[1].lower() in {".png"} and os.path.splitext(img_name)[0].lower() not in {"config"} ]
 
-    elements = Manager().dict()
-    print(f"上传文件中...")
     for j, img_path in enumerate(imgs):
-        up_img(img_path, j, elements)
-    print("上传时间", time.time() - a)
-    print(f"预发布中...")
-    a = time.time()
-    with sync_playwright() as p:
+        storage[str(j)] = up_img(img_path=img_path)
+        print(f"第{j + 1}张图片上传完成")
 
+    stroage = bytearray(json.dumps(storage),encoding='utf-8')
+    storage_size = len(stroage)
+
+    stroage = stroage + b'0' * (2000 * 2000 * 3 - len(stroage))
+    RGB_data = np.frombuffer(stroage, dtype=np.uint8).reshape(2000, 2000, 3)
+    img_data = cv2.imencode('.png', RGB_data)[1].tobytes()
+    storage_url = up_img(img_data=img_data)
+
+    with open(join_path(img_dir, "config.json"), 'r',encoding='utf-8') as f:
+        config = json.loads(f.read())
+
+    config["storage"] = {
+        "url": storage_url,
+        "size": str(storage_size)
+    }
+    print(config)
+
+    with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
@@ -65,11 +65,8 @@ def upload(img_dir, pan_path):
         page.set_viewport_size({"width": 1500, "height": 800})
         time.sleep(1)
         #标题与正文
-        img_config = join_path(img_dir, 'config.json')
-        with open(img_config, 'r') as f:
-            config = json.loads(f.read())
-            file_name = config["name"]
-            img_config = str(config).replace("'", '"')
+        file_name = config["file"]["name"]
+        img_config = str(config).replace("'", '"')
         title = page.wait_for_selector('//textarea[@placeholder="请输入文章标题（2～30个字）"]')
         title.fill("Pan: " + join_path(pan_path, file_name))
         text = page.locator('//div[@class="ProseMirror"]/p')
@@ -82,19 +79,6 @@ def upload(img_dir, pan_path):
 
         button_fengmian = page.locator('//span[text()="无封面"]')
         button_fengmian.click()
-        #<-- 预发布 -->
-        for i in range(len(elements)):
-            element_temp = create_element(elements[i])
-            page.evaluate(f"""
-                    () => {{
-                        const element = `{element_temp}`;
-                        const container = document.querySelector('#root > div > div.left-column > div > div.publish-editor > div.syl-editor-wrap > div > div.ProseMirror');  // 或者选择其他容器
-                        container.insertAdjacentHTML('beforeend', element);
-                    }}
-                """)
-            time.sleep(0.1)
-
-        time.sleep(3)
 
         # 提交
         page.wait_for_selector(
@@ -114,17 +98,6 @@ def upload(img_dir, pan_path):
         print(f"上传完成")
 
 
-def up_img(img_path, j, elements):
-    url = "https://mp.toutiao.com/spice/image?upload_source=20020002&aid=1231&device_platform=web"
-    a = requests.post(url=url, files={'image': open(img_path, 'rb')}, cookies=cookies)
-    elements[j] = a.json()
-    print(a.json())
-    print(f"第{j + 1}张图片上传完成")
-
-
-def save_img(image_path, RGB_data):
-    print(image_path)
-    cv2.imwrite(image_path, RGB_data)
 
 
 def file2img(file_path, img_dir, img_size):
@@ -135,8 +108,8 @@ def file2img(file_path, img_dir, img_size):
     with open(file_path, 'rb') as f:
         data = f.read()
     config = {
-        "name": os.path.basename(file_path),
-        "size": str(len(data)),
+        "file": {"name": os.path.basename(file_path),"size": str(len(data)),},
+        "storage": {"url": "","size": ""}
     }
     config_path = os.path.join(img_dir, "config.json")
     with open(config_path, "w") as f:
@@ -145,9 +118,9 @@ def file2img(file_path, img_dir, img_size):
     p = math.ceil(len(data) / cap)
     print("帧数:", p)
 
-    with Pool(processes=cpu_count()-1) as pool:
+    with Pool(processes=cpu_count() - 1) as pool:
         for i in range(0, len(data), cap):
-            print(f"正在转译第{i//cap+ 1}帧")
+            print(f"正在转译第{i // cap + 1}帧")
             image_path = join_path(img_dir, f"frame_{i // cap:06d}.png")
             data_ps = data[i:i + cap] + b'0' * (cap - len(data[i:i + cap]))
             RGB_data = np.frombuffer(data_ps, dtype=np.uint8).reshape(img_size[0], img_size[1], 3)
@@ -157,12 +130,11 @@ def file2img(file_path, img_dir, img_size):
     print("转译时间为", time.time() - a)
 
 
-
 if __name__ == '__main__':
-    file_path = r'../res/README'
-    img_dir = r"../res/temp/1"
-    img_size = (500,500)
+    file_path = r'../res/Desktop.7z'
+    img_dir = r"D:/zzztest/1"
+    img_size = (5000, 5000)
     pan_path = "../res/pan"
     file2img(file_path, img_dir, img_size)
-    #upload(img_dir, pan_path)
+    upload(img_dir, pan_path)
     #up_img("../res/temp/1732262973.5431807/frame_000001.png", 0, Manager().dict())
