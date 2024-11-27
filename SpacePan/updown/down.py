@@ -35,9 +35,9 @@ def download(url, file_dir):
 
     with open(os.path.join(file_dir, file_name), 'wb') as f:
         d = 0
-        for j in storage:
+        for j in range(len(storage)):
             print(f"正在下载第 {int(j) + 1} 张图片")
-            url = storage[j]
+            url = storage[str(j)]
             data_ps = down_img(url)
             if d + len(data_ps) >= file_size:
                 a = data_ps[0:(file_size - d)]
@@ -54,5 +54,5 @@ def download(url, file_dir):
 
 if __name__ == '__main__':
     file_path = f"D:/zzztest/{time.time()}"
-    url = 'https://www.toutiao.com/article/7441807664071311926/?log_from=19432a7cffeeb_1732681213061'
+    url = 'https://www.toutiao.com/article/7441969471504253479/?log_from=894ccd78e5553_1732721004092'
     download(url, file_path)
