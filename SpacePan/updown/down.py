@@ -1,82 +1,58 @@
-from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 import requests, cv2, os, time, json
-from utile.u import *
+import numpy as np
 
 with open('../config/config.json', 'r') as f:
     config = json.loads(f.read())
-    play_cookies = config["cookies"]["upload"]
+    play_cookies = config["cookies"]["main"]
     cookies = {cookie['name']: cookie['value'] for cookie in play_cookies}
 
 
-def download_img(url, file_path, cookies):
-    response = requests.get(url, cookies=cookies)
-    with open(file_path, 'wb') as f:
-        f.write(response.content)
-    print(f"图片已保存为 {file_path}")
+def down_img(url):
+    a = requests.get(url, cookies=cookies).content
+    RGB_data = np.frombuffer(a, np.uint8)
+    data = cv2.imdecode(RGB_data, cv2.IMREAD_UNCHANGED).tobytes()
+    return data
 
-def download(url, img_dir):
-    os.makedirs(img_dir, exist_ok=True)
+
+def download(url, file_dir):
+    #初始化
+    st = time.time()
+    os.makedirs(file_dir, exist_ok=True)
     content = requests.get(url, cookies=cookies).text
     soup = BeautifulSoup(content, 'html.parser')
-    img_tags = soup.find_all('div', attrs={"class": "pgc-img"})
     config_url = soup.find_all('p', attrs={"data-track": "1"})
+
     #文件信息
-    config = config_url[0].text.replace("1" * 300, "")
-    print("文件信息", str(config))
+    config = json.loads(config_url[0].text.replace("1" * 300, ""))
+    file_size, file_name = int(config["file"]["size"]), config["file"]["name"]
+    storage_url,storage_size = config["storage"]["url"], int(config["storage"]["size"])
+    storage_png = requests.get(storage_url, cookies=cookies).content
+    image_array = np.frombuffer(storage_png, np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_UNCHANGED)
 
-    imgs = [i.find_all('img')[0].get("src") for i in img_tags]
+    storage = json.loads(image.tobytes()[:storage_size].decode("utf-8"))
 
-    config_path = os.path.join(img_dir, "config.json")
-    with open(config_path, 'w') as f:
-        f.write(json.dumps(json.loads(config)))
-
-    st = time.time()
-    with ThreadPoolExecutor(max_workers=10) as executor:  # 设置最大线程数为10
-        th = []
-        for j, img_url in enumerate(imgs):
-            print(f"正在下载第 {j + 1} 张图片")
-            file_path = os.path.join(img_dir, f"frame_{j:06d}.png")
-            th.append(executor.submit(download_img, img_url, file_path, cookies))
-        for t in th:
-            t.result()
-
-    print("下载时间：", time.time() - st)
-
-
-def img2file(img_dir, file_dir):
-    config_path = join_path(img_dir, 'config.json')
-    os.makedirs(file_dir, exist_ok=True)
-
-    with open(config_path, 'r') as f:
-        config = json.loads(f.read())
-
-    file_path = join_path(file_dir, config['name']).replace("\\", "/")
-    size = int(config['size'])
-
-    d = 0
-    img = [f for f in os.listdir(img_dir) if os.path.splitext(f)[1].lower() in {".png"}]
-    img_len = len(img)
-    with open(file_path, 'wb') as f:
-        for i, img_name in enumerate(img):
-            print(f"正在写入第 {i + 1} 张图片")
-            img_path = join_path(img_dir, img_name)
-            print(img_path)
-            RGB_data = cv2.imread(img_path).tobytes()
-
-            if i == img_len - 1:
-                f.write(RGB_data[:size - d])
+    with open(os.path.join(file_dir, file_name), 'wb') as f:
+        d = 0
+        for j in storage:
+            print(f"正在下载第 {int(j) + 1} 张图片")
+            url = storage[j]
+            data_ps = down_img(url)
+            if d + len(data_ps) >= file_size:
+                a = data_ps[0:(file_size - d)]
+                f.write(a)
+                break
             else:
-                f.write(RGB_data)
-                d += len(RGB_data)
-    print(file_path, "写入成功")
+                f.write(data_ps)
+            d += len(data_ps)
+
+    print("总计时间：", time.time() - st)
+
+
 
 
 if __name__ == '__main__':
-    a = time.time()
-    img_dir = r"../res/temp/1"
-    file_path = r"../res/temp/2"
-    url = 'https://www.toutiao.com/article/7440027264546275881/'
-    #download(url, img_dir)
-    img2file(img_dir, file_path)
-    print(time.time() - a)
+    file_path = f"D:/zzztest/{time.time()}"
+    url = 'https://www.toutiao.com/article/7441807664071311926/?log_from=19432a7cffeeb_1732681213061'
+    download(url, file_path)

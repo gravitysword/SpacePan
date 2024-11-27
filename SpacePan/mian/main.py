@@ -1,30 +1,15 @@
 import time
 from updown import up,down
 
+def download_file(url,file_path):
+    file_path = f"D:/zzztest/{time.time()}"
+    url = 'https://www.toutiao.com/article/7441807664071311926/?log_from=19432a7cffeeb_1732681213061'
+    down.download(url, file_path)
 
-def Up():
-    file_path = "../res/z.7z"
-    img_dir = f"../res/temp/{time.time()}"
-    img_size = (5000,5000)
-    pan_path = "../res/pan"
-    up.file2img(file_path, img_dir, img_size)
-    up.upload(img_dir, pan_path)
-
-
-def Down():
-    a = time.time()
-    img_dir = f"../res/temp/{time.time()}"
-    file_path = r"../res/b1"
-    url = 'https://www.toutiao.com/article/7439928751518925353/'
-    down.download(url, img_dir)
-    down.img2file(img_dir, file_path)
-    print(time.time() - a)
+def upload_file(file_path):
+    file_path = f"D:/zzztest/{time.time()}"
+    pan_path = '/res/1.7z'
+    url = up.upload(file_path, pan_path)
+    print(url)
 
 
-
-if __name__ == '__main__':
-    x = input("输入操作模式\n")
-    if x == "1":
-        Up()
-    else:
-        Down()
