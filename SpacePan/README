@@ -2,4 +2,4 @@
 2. 配置config/config.json中的chrome浏览器地址
 然后，在main/main.py中查看并运行代码。
 
-//version= 使用编辑器加载图片并上传
+version: 多线程优化,使用系统自带的chrome浏览器
